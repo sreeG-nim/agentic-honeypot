@@ -1,16 +1,18 @@
-SCAM_KEYWORDS = [
-    "account",
-    "blocked",
-    "verify",
-    "click",
-    "otp",
-    "kyc",
-    "upi",
-    "bank",
-    "refund",
-    "urgent"
-]
+def is_scam_message(message) -> bool:
+    # ✅ Handle non-string inputs safely
+    if not isinstance(message, str):
+        return False
 
-def is_scam_message(message: str) -> bool:
     msg = message.lower()
-    return any(word in msg for word in SCAM_KEYWORDS)
+
+    scam_keywords = [
+        "send money",
+        "upi",
+        "bank",
+        "account",
+        "otp",
+        "urgent",
+        "transfer"
+    ]
+
+    return any(keyword in msg for keyword in scam_keywords)
