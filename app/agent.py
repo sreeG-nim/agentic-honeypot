@@ -1,29 +1,36 @@
 def generate_agent_reply(message, history):
     msg = message.lower() if isinstance(message, str) else ""
 
-    # First response after detection
+    # First engagement after detection
     if not history:
         return (
-            "Oh no, that sounds serious. I wasn’t aware of any issue. "
+            "That sounds serious… I wasn’t aware of any issue. "
             "Which bank is this regarding?"
         )
 
-    # If scammer mentions OTP
+    # If scammer asks for OTP
     if "otp" in msg:
         return (
-            "I did receive some message but I’m not sure which one you mean. "
-            "Can you tell me what sender name I should look for?"
+            "I received a few messages just now and I’m a bit confused. "
+            "Can you tell me which message or sender name I should look for?"
         )
 
-    # If scammer mentions account / transfer
-    if "account" in msg or "send" in msg or "transfer" in msg:
+    # If scammer asks for account / transfer
+    if "account" in msg or "send" in msg or "transfer" in msg or "upi" in msg:
         return (
-            "I’m a bit confused — where exactly am I supposed to send this? "
-            "Is there an account number or UPI ID I should use?"
+            "I want to fix this quickly but I’m not sure where to send anything. "
+            "Can you share the account number or UPI ID again?"
         )
 
-    # Fallback to keep engagement going
+    # If scammer mentions link
+    if "link" in msg or "click" in msg:
+        return (
+            "I’m not very comfortable clicking links. "
+            "Can you explain what will happen after I open it?"
+        )
+
+    # Keep the scammer engaged
     return (
-        "I’m trying to understand, but I’m not very technical. "
-        "Can you please explain the steps slowly?"
+        "I’m getting a bit worried now. "
+        "Can you please guide me step by step?"
     )
