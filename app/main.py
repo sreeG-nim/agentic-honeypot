@@ -1,7 +1,7 @@
-from fastapi import FastAPI, Header, HTTPException, Depends, Body
+from fastapi import FastAPI, Header, HTTPException, Depends, Request
 from typing import Optional
 
-from .schemas import ScamRequest, ScamResponse, Intelligence
+from .schemas import ScamResponse, Intelligence
 from .detector import is_scam_message
 from .agent import generate_agent_reply
 from .extractor import extract_intelligence
@@ -15,10 +15,7 @@ API_KEY = "N!m!$#@3reddy"
 
 def verify_api_key(x_api_key: Optional[str] = Header(None)):
     if x_api_key != API_KEY:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing API key"
-        )
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
 # =========================
@@ -39,28 +36,26 @@ def health(_: None = Depends(verify_api_key)):
 # MAIN HONEYPOT ENDPOINT
 # =========================
 @app.post("/message", response_model=ScamResponse)
-def handle_message(
-    req: ScamRequest = Body(None),
+async def handle_message(
+    request: Request,
     _: None = Depends(verify_api_key)
 ):
-    # ✅ HANDLE COMPLETELY MISSING BODY (tester-safe)
-    if req is None:
-        req = ScamRequest()
+    # 🔐 Safely read body (or default)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
 
-    # ✅ SAFE DEFAULTS
-    message = req.message or ""
-    history = req.history or []
+    message = body.get("message", "")
+    history = body.get("history", [])
 
-    # Detect scam intent
     is_scam = is_scam_message(message)
 
-    # Agent handoff
     if is_scam:
         reply = generate_agent_reply(message, history)
     else:
         reply = "Hello, how can I help you?"
 
-    # Extract scam intelligence
     intel = extract_intelligence(message)
 
     return ScamResponse(
