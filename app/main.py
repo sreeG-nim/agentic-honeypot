@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -7,56 +7,38 @@ from app.detector import is_scam_message
 from app.agent import generate_agent_reply
 from app.extractor import extract_intelligence
 
-# =========================
-# CONFIG
-# =========================
 API_KEY = "N!m!$#@3reddy"
 
-# =========================
-# APP INIT
-# =========================
 app = FastAPI(title="Agentic Honeypot API")
 
-# =========================
-# CORS (REQUIRED FOR BROWSER FRONTEND)
-# =========================
+# 🔥 EXPLICIT CORS (INCLUDING PREFLIGHT)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # frontend can be anywhere
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],      # includes OPTIONS
+    allow_headers=["*"],      # includes x-api-key
 )
 
-# =========================
-# ROOT (KEEP SIMPLE FOR RENDER)
-# =========================
-@app.api_route("/", methods=["GET", "HEAD"])
+@app.api_route("/", methods=["GET", "HEAD", "OPTIONS"])
 def root():
     return {"status": "honeypot running"}
 
-# =========================
-# API KEY CHECK
-# =========================
 def verify_api_key(x_api_key: Optional[str]):
     if x_api_key != API_KEY:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing API key"
-        )
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-# =========================
-# MAIN HONEYPOT ENDPOINT
-# =========================
-@app.api_route("/message", methods=["POST", "GET", "HEAD"])
+@app.api_route("/message", methods=["POST", "GET", "HEAD", "OPTIONS"])
 async def message_endpoint(
     request: Request,
     x_api_key: Optional[str] = Header(None),
 ):
-    # Auth
+    # OPTIONS preflight must return 200
+    if request.method == "OPTIONS":
+        return Response(status_code=200)
+
     verify_api_key(x_api_key)
 
-    # Safely parse body (tester may send empty body)
     try:
         body = await request.json()
         if not isinstance(body, dict):
@@ -69,24 +51,20 @@ async def message_endpoint(
         history = []
 
     message = body.get("message", "")
-
-    # If message missing, infer from last scammer message
     if not message:
         for h in reversed(history):
             if isinstance(h, dict) and h.get("role") == "scammer":
                 message = h.get("content", "")
                 break
 
-    # Scam detection
     is_scam = bool(message) and is_scam_message(message)
 
-    # Agent reply
-    if is_scam:
-        reply = generate_agent_reply(message, history)
-    else:
-        reply = "Hello, how can I help you?"
+    reply = (
+        generate_agent_reply(message, history)
+        if is_scam
+        else "Hello, how can I help you?"
+    )
 
-    # Intelligence extraction
     intel = extract_intelligence(message)
 
     return JSONResponse(
@@ -95,13 +73,7 @@ async def message_endpoint(
             "is_scam": is_scam,
             "agent_active": is_scam,
             "reply": reply,
-            "metrics": {
-                "turns": len(history) + 1
-            },
-            "extracted_intelligence": {
-                "bank_accounts": intel.get("bank_accounts", []),
-                "upi_ids": intel.get("upi_ids", []),
-                "phishing_links": intel.get("phishing_links", [])
-            }
-        }
+            "metrics": {"turns": len(history) + 1},
+            "extracted_intelligence": intel,
+        },
     )
