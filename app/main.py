@@ -11,29 +11,35 @@ API_KEY = "N!m!$#@3reddy"
 
 app = FastAPI(title="Agentic Honeypot API")
 
-# 🔥 EXPLICIT CORS (INCLUDING PREFLIGHT)
+# ===== CORS =====
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],      # includes OPTIONS
-    allow_headers=["*"],      # includes x-api-key
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-@app.api_route("/", methods=["GET", "HEAD", "OPTIONS"])
+# ===== In-memory conversation store =====
+CONVERSATIONS = {}
+
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {"status": "honeypot running"}
 
-def verify_api_key(x_api_key: Optional[str]):
-    if x_api_key != API_KEY:
+def verify_api_key(key: Optional[str]):
+    if key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-@app.api_route("/message", methods=["POST", "GET", "HEAD", "OPTIONS"])
+def confidence_score(message: str) -> int:
+    keywords = ["otp", "urgent", "blocked", "verify", "kyc", "transfer", "account"]
+    score = 30 + sum(15 for k in keywords if k in message.lower())
+    return min(score, 95)
+
+@app.api_route("/message", methods=["POST", "OPTIONS"])
 async def message_endpoint(
     request: Request,
     x_api_key: Optional[str] = Header(None),
 ):
-    # OPTIONS preflight must return 200
     if request.method == "OPTIONS":
         return Response(status_code=200)
 
@@ -41,39 +47,44 @@ async def message_endpoint(
 
     try:
         body = await request.json()
-        if not isinstance(body, dict):
-            body = {}
     except Exception:
         body = {}
 
-    history = body.get("history", [])
-    if not isinstance(history, list):
-        history = []
-
+    conv_id = body.get("conversation_id", "default")
     message = body.get("message", "")
-    if not message:
-        for h in reversed(history):
-            if isinstance(h, dict) and h.get("role") == "scammer":
-                message = h.get("content", "")
-                break
+    history = body.get("history", [])
 
-    is_scam = bool(message) and is_scam_message(message)
+    if conv_id not in CONVERSATIONS:
+        CONVERSATIONS[conv_id] = []
+
+    CONVERSATIONS[conv_id].append({
+        "role": "scammer",
+        "content": message
+    })
+
+    is_scam = is_scam_message(message)
 
     reply = (
-        generate_agent_reply(message, history)
+        generate_agent_reply(message, CONVERSATIONS[conv_id])
         if is_scam
         else "Hello, how can I help you?"
     )
 
+    CONVERSATIONS[conv_id].append({
+        "role": "honeypot",
+        "content": reply
+    })
+
     intel = extract_intelligence(message)
 
     return JSONResponse(
-        status_code=200,
         content={
             "is_scam": is_scam,
             "agent_active": is_scam,
             "reply": reply,
-            "metrics": {"turns": len(history) + 1},
+            "confidence_score": confidence_score(message),
+            "metrics": {"turns": len(CONVERSATIONS[conv_id])},
+            "memory": CONVERSATIONS[conv_id],
             "extracted_intelligence": intel,
-        },
+        }
     )
