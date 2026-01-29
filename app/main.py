@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Body
 from typing import Optional
 
 from .schemas import ScamRequest, ScamResponse, Intelligence
@@ -40,29 +40,37 @@ def health(_: None = Depends(verify_api_key)):
 # =========================
 @app.post("/message", response_model=ScamResponse)
 def handle_message(
-    req: ScamRequest,
+    req: ScamRequest = Body(None),
     _: None = Depends(verify_api_key)
 ):
+    # ✅ HANDLE COMPLETELY MISSING BODY (tester-safe)
+    if req is None:
+        req = ScamRequest()
+
+    # ✅ SAFE DEFAULTS
+    message = req.message or ""
+    history = req.history or []
+
     # Detect scam intent
-    is_scam = is_scam_message(req.message)
+    is_scam = is_scam_message(message)
 
     # Agent handoff
     if is_scam:
-        reply = generate_agent_reply(req.message, req.history)
+        reply = generate_agent_reply(message, history)
     else:
         reply = "Hello, how can I help you?"
 
     # Extract scam intelligence
-    intel = extract_intelligence(req.message)
+    intel = extract_intelligence(message)
 
     return ScamResponse(
         is_scam=is_scam,
         agent_active=is_scam,
         reply=reply,
-        metrics={"turns": len(req.history) + 1},
+        metrics={"turns": len(history) + 1},
         extracted_intelligence=Intelligence(
-            bank_accounts=intel["bank_accounts"],
-            upi_ids=intel["upi_ids"],
-            phishing_links=intel["phishing_links"],
+            bank_accounts=intel.get("bank_accounts", []),
+            upi_ids=intel.get("upi_ids", []),
+            phishing_links=intel.get("phishing_links", []),
         )
     )
