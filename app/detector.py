@@ -1,22 +1,12 @@
-def is_scam_message(message) -> bool:
+def is_scam_message(message: str) -> bool:
     if not isinstance(message, str):
         return False
 
-    msg = message.lower()
-
-    scam_keywords = [
-        "otp",
-        "one time password",
-        "account number",
-        "bank security",
-        "verify your account",
-        "urgent",
-        "suspended",
-        "send money",
-        "transfer",
-        "upi",
-        "click link",
-        "secure your account",
+    keywords = [
+        "otp", "upi", "bank", "urgent", "verify",
+        "account", "transfer", "refund", "click",
+        "police", "loan", "crypto", "job"
     ]
 
-    return any(keyword in msg for keyword in scam_keywords)
+    msg = message.lower()
+    return any(k in msg for k in keywords)

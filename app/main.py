@@ -11,42 +11,20 @@ API_KEY = "N!m!$#@3reddy"
 app = FastAPI()
 
 
-# ======================================================
-# ROOT ENDPOINT — NO AUTH (CONNECTIVITY CHECK)
-# ======================================================
 @app.api_route("/", methods=["GET", "POST", "HEAD"])
 def root():
-    return JSONResponse(
-        status_code=200,
-        content={"status": "honeypot running"}
-    )
+    return JSONResponse(status_code=200, content={"status": "honeypot running"})
 
 
-# ======================================================
-# API KEY CHECK
-# ======================================================
 def check_api_key(x_api_key: Optional[str]):
     if x_api_key != API_KEY:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing API key"
-        )
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
-# ======================================================
-# MAIN HONEYPOT ENDPOINT
-# ======================================================
 @app.api_route("/message", methods=["GET", "POST", "HEAD"])
-async def message_endpoint(
-    request: Request,
-    x_api_key: Optional[str] = Header(None)
-):
-    # 🔐 Enforce API key
+async def message_endpoint(request: Request, x_api_key: Optional[str] = Header(None)):
     check_api_key(x_api_key)
 
-    # --------------------------------------------------
-    # SAFE BODY PARSING (NO VALIDATION FAILURES)
-    # --------------------------------------------------
     try:
         body = await request.json()
         if not isinstance(body, dict):
@@ -54,65 +32,43 @@ async def message_endpoint(
     except Exception:
         body = {}
 
-    # --------------------------------------------------
-    # HISTORY EXTRACTION
-    # --------------------------------------------------
     history = body.get("history", [])
     if not isinstance(history, list):
         history = []
 
-    # --------------------------------------------------
-    # MESSAGE EXTRACTION (HISTORY-FIRST)
-    # --------------------------------------------------
-    message = body.get("message")
+    message = body.get("message", "")
 
     last_scammer_msg = ""
-    for item in reversed(history):
-        if isinstance(item, dict) and item.get("role") == "scammer":
-            last_scammer_msg = item.get("content", "")
+    for h in reversed(history):
+        if isinstance(h, dict) and h.get("role") == "scammer":
+            last_scammer_msg = h.get("content", "")
             break
 
-    if not isinstance(message, str) or not message.strip():
+    if not message:
         message = last_scammer_msg
 
-    if not isinstance(message, str):
-        message = ""
-
-    # --------------------------------------------------
-    # FINAL SCAM DECISION
-    # --------------------------------------------------
-    # If scammer has ever spoken → THIS IS A SCAM
     is_scam = bool(last_scammer_msg) or is_scam_message(message)
 
-    # --------------------------------------------------
-    # AGENT RESPONSE
-    # --------------------------------------------------
     if is_scam:
-        reply = generate_agent_reply(message, history)
+        try:
+            reply = generate_agent_reply(message, history)
+        except Exception:
+            reply = "Sorry… my phone is acting weird. Can you explain again?"
     else:
         reply = "Hello, how can I help you?"
 
-    # --------------------------------------------------
-    # INTELLIGENCE EXTRACTION
-    # --------------------------------------------------
-    intel = extract_intelligence(message)
+    try:
+        intel = extract_intelligence(message)
+    except Exception:
+        intel = {"bank_accounts": [], "upi_ids": [], "phishing_links": []}
 
-    # --------------------------------------------------
-    # FORCE JSON RESPONSE (TESTER-SAFE)
-    # --------------------------------------------------
     return JSONResponse(
         status_code=200,
         content={
             "is_scam": is_scam,
             "agent_active": is_scam,
             "reply": reply,
-            "metrics": {
-                "turns": len(history) + 1
-            },
-            "extracted_intelligence": {
-                "bank_accounts": intel.get("bank_accounts", []),
-                "upi_ids": intel.get("upi_ids", []),
-                "phishing_links": intel.get("phishing_links", []),
-            }
-        }
+            "metrics": {"turns": len(history) + 1},
+            "extracted_intelligence": intel,
+        },
     )
