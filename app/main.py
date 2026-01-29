@@ -16,18 +16,20 @@ def check_api_key(x_api_key: Optional[str]):
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
+# ✅ ROOT: NO AUTH (tester connectivity probe)
 @app.api_route("/", methods=["GET", "POST", "HEAD"])
-def root(x_api_key: Optional[str] = Header(None)):
-    check_api_key(x_api_key)
+def root():
     return {"status": "honeypot running"}
 
 
+# 🔐 Health check (auth required)
 @app.get("/health")
 def health(x_api_key: Optional[str] = Header(None)):
     check_api_key(x_api_key)
     return {"status": "ok"}
 
 
+# 🔐 Main honeypot endpoint
 @app.api_route("/message", methods=["GET", "POST", "HEAD"])
 async def message_endpoint(
     request: Request,
