@@ -1,5 +1,5 @@
 def is_scam_message(message) -> bool:
-    # ✅ Handle non-string inputs safely
+    # Fully defensive
     if not isinstance(message, str):
         return False
 
@@ -12,7 +12,8 @@ def is_scam_message(message) -> bool:
         "account",
         "otp",
         "urgent",
-        "transfer"
+        "transfer",
+        "pay now"
     ]
 
     return any(keyword in msg for keyword in scam_keywords)

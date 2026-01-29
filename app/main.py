@@ -6,32 +6,31 @@ from .detector import is_scam_message
 from .agent import generate_agent_reply
 from .extractor import extract_intelligence
 
-
 API_KEY = "N!m!$#@3reddy"
 
 app = FastAPI()
 
 
-# =========================
-# AUTH CHECK (MANUAL)
-# =========================
 def check_api_key(x_api_key: Optional[str]):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
-# =========================
-# ROOT (TESTER CONNECTIVITY)
-# =========================
+# Root endpoint (tester connectivity check)
 @app.api_route("/", methods=["GET", "POST", "HEAD"])
 def root(x_api_key: Optional[str] = Header(None)):
     check_api_key(x_api_key)
     return {"status": "honeypot running"}
 
 
-# =========================
-# MAIN ENDPOINT
-# =========================
+# Health check
+@app.get("/health")
+def health(x_api_key: Optional[str] = Header(None)):
+    check_api_key(x_api_key)
+    return {"status": "ok"}
+
+
+# Main honeypot endpoint (ALL methods handled)
 @app.api_route("/message", methods=["GET", "POST", "HEAD"])
 async def message_endpoint(
     request: Request,
@@ -50,9 +49,11 @@ async def message_endpoint(
     message = body.get("message", "")
     history = body.get("history", [])
 
-    # Defensive type handling
+    # Defensive type safety
     if not isinstance(message, str):
         message = ""
+    if not isinstance(history, list):
+        history = []
 
     is_scam = is_scam_message(message)
 
@@ -69,8 +70,8 @@ async def message_endpoint(
         reply=reply,
         metrics={"turns": 1},
         extracted_intelligence=Intelligence(
-            bank_accounts=intel.get("bank_accounts", []),
-            upi_ids=intel.get("upi_ids", []),
-            phishing_links=intel.get("phishing_links", []),
+            bank_accounts=intel["bank_accounts"],
+            upi_ids=intel["upi_ids"],
+            phishing_links=intel["phishing_links"],
         )
     )
