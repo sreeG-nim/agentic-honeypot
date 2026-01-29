@@ -11,25 +11,35 @@ API_KEY = "N!m!$#@3reddy"
 app = FastAPI()
 
 
+# =========================
+# ROOT — NO AUTH, EVER
+# =========================
+@app.api_route("/", methods=["GET", "POST", "HEAD"])
+def root():
+    # Debug marker to confirm new code is live
+    return {"status": "honeypot running", "root_auth": "disabled"}
+
+
+# =========================
+# AUTH CHECK
+# =========================
 def check_api_key(x_api_key: Optional[str]):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
-# ✅ ROOT: NO AUTH (tester connectivity probe)
-@app.api_route("/", methods=["GET", "POST", "HEAD"])
-def root():
-    return {"status": "honeypot running"}
-
-
-# 🔐 Health check (auth required)
+# =========================
+# HEALTH (AUTH REQUIRED)
+# =========================
 @app.get("/health")
 def health(x_api_key: Optional[str] = Header(None)):
     check_api_key(x_api_key)
     return {"status": "ok"}
 
 
-# 🔐 Main honeypot endpoint
+# =========================
+# MESSAGE (AUTH REQUIRED)
+# =========================
 @app.api_route("/message", methods=["GET", "POST", "HEAD"])
 async def message_endpoint(
     request: Request,
