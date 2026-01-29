@@ -11,34 +11,34 @@ API_KEY = "N!m!$#@3reddy"
 app = FastAPI()
 
 
-# =========================
-# ROOT ENDPOINT (NO AUTH)
-# =========================
+# ======================================================
+# ROOT ENDPOINT — NO AUTH (tester connectivity check)
+# ======================================================
 @app.api_route("/", methods=["GET", "POST", "HEAD"])
 def root():
     return {"status": "honeypot running"}
 
 
-# =========================
-# AUTH CHECK
-# =========================
+# ======================================================
+# API KEY CHECK
+# ======================================================
 def check_api_key(x_api_key: Optional[str]):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
-# =========================
-# HEALTH CHECK (AUTH)
-# =========================
+# ======================================================
+# HEALTH CHECK — AUTH REQUIRED
+# ======================================================
 @app.get("/health")
 def health(x_api_key: Optional[str] = Header(None)):
     check_api_key(x_api_key)
     return {"status": "ok"}
 
 
-# =========================
+# ======================================================
 # MAIN HONEYPOT ENDPOINT
-# =========================
+# ======================================================
 @app.api_route("/message", methods=["GET", "POST", "HEAD"])
 async def message_endpoint(
     request: Request,
@@ -60,29 +60,34 @@ async def message_endpoint(
     if not isinstance(history, list):
         history = []
 
-    # 🔥 Extract message
+    # Extract message field if present
     message = body.get("message")
 
-    # 🔥 FALLBACK: pull last scammer message from history
-    if not message and history:
-        for item in reversed(history):
-            if isinstance(item, dict) and item.get("role") == "scammer":
-                message = item.get("content", "")
-                break
+    # 🔥 ALWAYS extract last scammer message from history
+    last_scammer_msg = ""
+    for item in reversed(history):
+        if isinstance(item, dict) and item.get("role") == "scammer":
+            last_scammer_msg = item.get("content", "")
+            break
+
+    # If message is missing or empty, use scammer history
+    if not isinstance(message, str) or not message.strip():
+        message = last_scammer_msg
 
     if not isinstance(message, str):
         message = ""
 
-    # Scam detection
-    is_scam = is_scam_message(message)
+    # 🔥 FINAL SCAM DECISION LOGIC
+    # If scammer has spoken even once → this IS a scam
+    is_scam = bool(last_scammer_msg) or is_scam_message(message)
 
-    # Agent handoff
+    # 🔥 ONCE SCAM → AGENT ALWAYS ACTIVE
     if is_scam:
         reply = generate_agent_reply(message, history)
     else:
         reply = "Hello, how can I help you?"
 
-    # Intelligence extraction
+    # Extract intelligence from current message
     intel = extract_intelligence(message)
 
     return ScamResponse(
