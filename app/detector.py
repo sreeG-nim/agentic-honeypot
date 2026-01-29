@@ -5,8 +5,7 @@ def is_scam_message(message: str) -> bool:
     keywords = [
         "otp", "upi", "bank", "urgent", "verify",
         "account", "transfer", "refund", "click",
-        "police", "loan", "crypto", "job"
+        "police", "job", "crypto", "loan"
     ]
 
-    msg = message.lower()
-    return any(k in msg for k in keywords)
+    return any(k in message.lower() for k in keywords)
