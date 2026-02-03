@@ -1,211 +1,101 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Agentic Honeypot</title>
-
-  <style>
-    :root {
-      --bg: #f7f8fa;
-      --panel: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --scammer: #fee2e2;
-      --honeypot: #e0f2fe;
-      --border: #e5e7eb;
-    }
-
-    * {
-      box-sizing: border-box;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      justify-content: center;
-      padding: 40px;
-    }
-
-    .app {
-      width: 100%;
-      max-width: 900px;
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 20px;
-    }
-
-    .panel {
-      background: var(--panel);
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      padding: 20px;
-    }
-
-    h1 {
-      font-size: 20px;
-      margin-bottom: 16px;
-    }
-
-    .chat {
-      display: flex;
-      flex-direction: column;
-      height: 500px;
-    }
-
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding-right: 10px;
-    }
-
-    .bubble {
-      max-width: 80%;
-      padding: 12px 14px;
-      border-radius: 14px;
-      margin-bottom: 12px;
-      line-height: 1.4;
-      font-size: 14px;
-    }
-
-    .scammer {
-      background: var(--scammer);
-      align-self: flex-start;
-    }
-
-    .honeypot {
-      background: var(--honeypot);
-      align-self: flex-end;
-    }
-
-    .input {
-      display: flex;
-      margin-top: 10px;
-      gap: 10px;
-    }
-
-    input {
-      flex: 1;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      font-size: 14px;
-    }
-
-    button {
-      padding: 12px 18px;
-      border-radius: 10px;
-      border: none;
-      background: #111827;
-      color: white;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #1f2937;
-    }
-
-    .intel h2 {
-      font-size: 16px;
-      margin-bottom: 10px;
-    }
-
-    pre {
-      background: #f9fafb;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 13px;
-      overflow-x: auto;
-      border: 1px solid var(--border);
-    }
-
-    .hint {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 8px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Agentic Honeypot</title>
+<style>
+body { font-family: Arial; background: #f7f7f7; padding: 20px; }
+.container { display: flex; gap: 20px; }
+.panel { background: white; padding: 20px; border-radius: 10px; width: 50%; }
+.bubble { padding: 12px; margin: 8px 0; border-radius: 10px; }
+.red { background: #ffe3e3; }
+.green { background: #e3ffe9; }
+button { margin: 5px; }
+</style>
 </head>
 
 <body>
 
-  <div class="app">
+<h2>Agentic Honeypot — Scam Interaction Simulator</h2>
 
-    <!-- CHAT PANEL -->
-    <div class="panel chat">
-      <h1>Agentic Honeypot — Scam Interaction Simulator</h1>
+<div class="scenarios">
+<button onclick="sendScenario('otp')">🏦 OTP Scam</button>
+<button onclick="sendScenario('upi')">📲 UPI Fraud</button>
+<button onclick="sendScenario('kyc')">🪪 KYC Expiry</button>
+<button onclick="sendScenario('lottery')">🎉 Lottery</button>
+</div>
 
-      <div id="messages" class="messages"></div>
+<div class="container">
+<div class="panel">
+<div id="chat"></div>
 
-      <div class="input">
-        <input id="input" placeholder="Type scammer message…" />
-        <button onclick="send()">Send</button>
-      </div>
+<input id="input" placeholder="Type scammer message..." style="width:80%">
+<button onclick="send()">Send</button>
+<p id="confidence"></p>
+</div>
 
-      <div class="hint">
-        You are simulating the <strong>scammer</strong>. The system responds as a victim honeypot.
-      </div>
-    </div>
-
-    <!-- INTELLIGENCE PANEL -->
-    <div class="panel intel">
-      <h2>Extracted Intelligence</h2>
-      <pre id="intel">{}</pre>
-    </div>
-
-  </div>
+<div class="panel">
+<h4>Extracted Intelligence</h4>
+<pre id="intel">{}</pre>
+</div>
+</div>
 
 <script>
-  const API_URL = "https://agentic-honeypot-grbb.onrender.com/message";
-  const API_KEY = "N!m!$#@3reddy";
+const API_URL = "https://agentic-honeypot-grbb.onrender.com/message";
+const API_KEY = "N!m!$#@3reddy";
+let history = [];
 
-  let history = [];
+const SCENARIOS = {
+  otp: "Urgent call from SBI. Share OTP now",
+  upi: "Send ₹5000 to demo.user@upi",
+  kyc: "Your KYC expires today. Verify immediately",
+  lottery: "You won ₹25 lakh. Pay processing fee"
+};
 
-  async function send() {
-    const input = document.getElementById("input");
-    const text = input.value.trim();
-    if (!text) return;
+function sendScenario(type) {
+  document.getElementById("input").value = SCENARIOS[type];
+  send();
+}
 
-    history.push({ role: "scammer", content: text });
-    render();
+async function send() {
+  const msg = document.getElementById("input").value;
+  document.getElementById("input").value = "";
 
-    input.value = "";
+  const res = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY
+    },
+    body: JSON.stringify({
+      conversation_id: "demo",
+      message: msg,
+      history
+    })
+  });
 
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": API_KEY
-      },
-      body: JSON.stringify({ history })
-    });
+  const data = await res.json();
+  history = data.memory;
 
-    const data = await res.json();
+  renderChat(history);
+  document.getElementById("intel").innerText =
+    JSON.stringify(data.extracted_intelligence, null, 2);
 
-    history.push({ role: "honeypot", content: data.reply });
-    render();
+  document.getElementById("confidence").innerText =
+    "Scam Confidence: " + data.confidence_score + "%";
+}
 
-    document.getElementById("intel").textContent =
-      JSON.stringify(data.extracted_intelligence, null, 2);
-  }
+function renderChat(memory) {
+  const chat = document.getElementById("chat");
+  chat.innerHTML = "";
 
-  function render() {
-    const messages = document.getElementById("messages");
-    messages.innerHTML = "";
-
-    history.forEach(m => {
-      const div = document.createElement("div");
-      div.className = `bubble ${m.role}`;
-      div.textContent = m.content;
-      messages.appendChild(div);
-    });
-
-    messages.scrollTop = messages.scrollHeight;
-  }
+  memory.forEach(m => {
+    const div = document.createElement("div");
+    div.className = "bubble " + (m.role === "scammer" ? "red" : "green");
+    div.innerText = m.content;
+    chat.appendChild(div);
+  });
+}
 </script>
-
 </body>
 </html>
