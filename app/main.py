@@ -9,7 +9,7 @@ API_KEY = "N!m!$#@3reddy"
 SCAM_REPLIES = [
     "Why is my account being suspended?",
     "This sounds serious. What happened?",
-    "I didn’t receive any prior notice. Can you explain?",
+    "I didn’t receive any notice earlier. Can you explain?",
     "Is my account already blocked?",
 ]
 
@@ -23,9 +23,9 @@ def looks_like_scam(text: str) -> bool:
     return any(t in text.lower() for t in triggers)
 
 # -----------------------------
-# OPEN GET /  (tester probe)
+# OPEN PROBE (NO AUTH)
 # -----------------------------
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD", "OPTIONS"])
 async def open_probe():
     return {
         "status": "success",
@@ -33,7 +33,7 @@ async def open_probe():
     }
 
 # -----------------------------
-# POST /  (real evaluation)
+# REAL HANDLER (AUTH REQUIRED)
 # -----------------------------
 @app.post("/")
 async def main_handler(
