@@ -6,7 +6,7 @@ from app.detector import is_scam_message
 from app.agent import generate_agent_reply
 from app.extractor import extract_intelligence
 
-API_KEY = "N!m!$#@3reddy"
+API_KEY = "N!m!$#@3redd"
 
 app = FastAPI(title="Agentic Honeypot API")
 
