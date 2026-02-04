@@ -4,6 +4,18 @@ import random
 
 app = FastAPI()
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    body = await request.body()
+    print("===== INCOMING REQUEST =====")
+    print("METHOD:", request.method)
+    print("PATH:", request.url.path)
+    print("HEADERS:", dict(request.headers))
+    print("BODY:", body)
+    print("============================")
+    response = await call_next(request)
+    return response
+
 API_KEY = "N!m!$#@3reddy"
 
 def verify_api_key(key: Optional[str]):
