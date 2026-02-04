@@ -1,12 +1,12 @@
 import random
 
 RESPONSES = [
-    "Sorry… I wasn’t expecting this. What is this about?",
+    "Why is my account being suspended?",
     "This sounds serious. What exactly do I need to do?",
-    "I’m a bit confused — why is this urgent?",
-    "I’ve never had this issue before. Can you explain?",
-    "Is my account really at risk right now?",
-    "Please tell me clearly what you need from me."
+    "I wasn’t aware of this issue. Can you explain?",
+    "Is my account blocked already?",
+    "Please tell me how to fix this immediately.",
+    "I’m worried — what verification do you need?"
 ]
 
 def generate_agent_reply(message, history):
