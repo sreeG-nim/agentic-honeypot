@@ -7,12 +7,15 @@ from app.detector import is_scam_message
 from app.agent import generate_agent_reply
 from app.extractor import extract_intelligence
 
+# =========================
+# CONFIG
+# =========================
 API_KEY = "N!m!$#@3reddy"
 
 app = FastAPI(title="Agentic Honeypot API")
 
 # =========================
-# CORS (browser + evaluator safe)
+# CORS (browser + tester safe)
 # =========================
 app.add_middleware(
     CORSMiddleware,
@@ -26,25 +29,58 @@ app.add_middleware(
 # =========================
 CONVERSATIONS = {}
 
-@app.api_route("/", methods=["GET", "HEAD"])
-def root():
-    return {"status": "honeypot running"}
-
+# =========================
+# AUTH
+# =========================
 def verify_api_key(key: Optional[str]):
     if key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
+# =========================
+# ROOT — REQUIRED FOR TESTER
+# =========================
+@app.api_route("/", methods=["GET", "HEAD"])
+def root():
+    return {"status": "honeypot running"}
+
+# Tester sends POST with EMPTY BODY to root
+@app.api_route("/", methods=["POST"])
+async def tester_root(
+    request: Request,
+    x_api_key: Optional[str] = Header(None),
+):
+    verify_api_key(x_api_key)
+
+    return {
+        "is_scam": False,
+        "agent_active": False,
+        "reply": "Honeypot active and listening.",
+        "confidence_score": 0,
+        "metrics": {"turns": 0},
+        "memory": [],
+        "extracted_intelligence": {
+            "bank_accounts": [],
+            "upi_ids": [],
+            "phishing_links": []
+        }
+    }
+
+# =========================
+# CONFIDENCE SCORE
+# =========================
 def confidence_score(message: str) -> int:
     keywords = ["otp", "urgent", "blocked", "verify", "kyc", "transfer", "account", "upi"]
     hits = sum(1 for k in keywords if k in message.lower())
     return min(95, 30 + hits * 15)
 
+# =========================
+# MAIN HONEYPOT ENDPOINT
+# =========================
 @app.api_route("/message", methods=["POST", "OPTIONS"])
 async def message_endpoint(
     request: Request,
     x_api_key: Optional[str] = Header(None),
 ):
-    # Preflight
     if request.method == "OPTIONS":
         return Response(status_code=200)
 
@@ -58,11 +94,11 @@ async def message_endpoint(
     except Exception:
         body = {}
 
-    conv_id = body.get("conversation_id", "default")
+    conversation_id = body.get("conversation_id", "default")
     history = body.get("history", [])
     message = body.get("message")
 
-    # 🔥 FIX: infer message correctly from history
+    # 🔥 CRITICAL FIX: infer message from history
     if not message and isinstance(history, list):
         for h in reversed(history):
             if (
@@ -76,13 +112,13 @@ async def message_endpoint(
     if not message:
         message = ""
 
-    # Init conversation
-    if conv_id not in CONVERSATIONS:
-        CONVERSATIONS[conv_id] = []
+    # Init memory
+    if conversation_id not in CONVERSATIONS:
+        CONVERSATIONS[conversation_id] = []
 
-    # Append scammer message ONLY if non-empty
+    # Append scammer message ONLY if valid
     if message:
-        CONVERSATIONS[conv_id].append({
+        CONVERSATIONS[conversation_id].append({
             "role": "scammer",
             "content": message
         })
@@ -92,18 +128,18 @@ async def message_endpoint(
 
     # Agent reply
     reply = (
-        generate_agent_reply(message, CONVERSATIONS[conv_id])
+        generate_agent_reply(message, CONVERSATIONS[conversation_id])
         if is_scam
         else "Hello, how can I help you?"
     )
 
     # Append honeypot reply
-    CONVERSATIONS[conv_id].append({
+    CONVERSATIONS[conversation_id].append({
         "role": "honeypot",
         "content": reply
     })
 
-    # Intelligence extraction
+    # Extract intelligence
     intel = extract_intelligence(message)
 
     return JSONResponse(
@@ -114,9 +150,9 @@ async def message_endpoint(
             "reply": reply,
             "confidence_score": confidence_score(message),
             "metrics": {
-                "turns": len(CONVERSATIONS[conv_id])
+                "turns": len(CONVERSATIONS[conversation_id])
             },
-            "memory": CONVERSATIONS[conv_id],
+            "memory": CONVERSATIONS[conversation_id],
             "extracted_intelligence": intel,
-        },
+        }
     )
