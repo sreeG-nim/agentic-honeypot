@@ -10,9 +10,9 @@ API_KEY = "N!m!$#@3redd"
 
 app = FastAPI(title="Agentic Honeypot API")
 
-# =========================
+# -------------------------
 # CORS
-# =========================
+# -------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,21 +20,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =========================
-# MEMORY
-# =========================
+# -------------------------
+# In-memory store
+# -------------------------
 CONVERSATIONS = {}
 
-# =========================
-# AUTH
-# =========================
+# -------------------------
+# Auth
+# -------------------------
 def verify_api_key(key: Optional[str]):
     if key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-# =========================
-# ROOT ENDPOINT (OFFICIAL TESTER)
-# =========================
+# =====================================================
+# ROOT ENDPOINT — OFFICIAL TESTER CALLS THIS
+# =====================================================
 @app.post("/")
 async def tester_entrypoint(
     request: Request,
@@ -42,6 +42,7 @@ async def tester_entrypoint(
 ):
     verify_api_key(x_api_key)
 
+    # 🔒 CRITICAL: accept EMPTY BODY
     try:
         body = await request.json()
         if not isinstance(body, dict):
@@ -49,34 +50,40 @@ async def tester_entrypoint(
     except Exception:
         body = {}
 
-    # Extract tester message safely
-    text = ""
-    try:
-        msg_obj = body.get("message", {})
-        if isinstance(msg_obj, dict):
-            text = msg_obj.get("text", "")
-        if not isinstance(text, str):
-            text = ""
-    except Exception:
+    # ---- Tester payload path ----
+    if "sessionId" in body and "message" in body:
         text = ""
 
-    is_scam = is_scam_message(text)
+        msg_obj = body.get("message")
+        if isinstance(msg_obj, dict):
+            text = msg_obj.get("text", "")
 
-    reply = (
-        generate_agent_reply(text, [])
-        if is_scam
-        else "Hello, how can I help you?"
-    )
+        if not isinstance(text, str):
+            text = ""
 
-    # ✅ EXACT FORMAT REQUIRED BY ORGANIZER
+        is_scam = is_scam_message(text)
+
+        reply = (
+            generate_agent_reply(text, [])
+            if is_scam
+            else "Hello, how can I help you?"
+        )
+
+        # ✅ EXACT response expected by organizer
+        return {
+            "status": "success",
+            "reply": reply
+        }
+
+    # ---- Empty / probe request ----
     return {
         "status": "success",
-        "reply": reply
+        "reply": "Honeypot active and listening."
     }
 
-# =========================
-# FULL HONEYPOT ENDPOINT
-# =========================
+# =====================================================
+# FULL HONEYPOT ENDPOINT (REAL EVALUATION)
+# =====================================================
 @app.api_route("/message", methods=["POST", "OPTIONS"])
 async def message_endpoint(
     request: Request,
@@ -98,12 +105,14 @@ async def message_endpoint(
     history = body.get("history", [])
     message = body.get("message")
 
-    # Infer message from history if needed
+    # Infer message from history if missing
     if not isinstance(message, str) and isinstance(history, list):
         for h in reversed(history):
             if isinstance(h, dict) and h.get("role") == "scammer":
-                message = h.get("content", "")
-                break
+                content = h.get("content")
+                if isinstance(content, str):
+                    message = content
+                    break
 
     if not isinstance(message, str):
         message = ""
@@ -136,9 +145,7 @@ async def message_endpoint(
         "is_scam": is_scam,
         "agent_active": is_scam,
         "reply": reply,
-        "metrics": {
-            "turns": len(CONVERSATIONS[conversation_id])
-        },
+        "metrics": {"turns": len(CONVERSATIONS[conversation_id])},
         "memory": CONVERSATIONS[conversation_id],
         "extracted_intelligence": intel
     }
